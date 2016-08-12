@@ -58,6 +58,43 @@ class AmazonSes extends phplistPlugin
         ),
     );
 
+    private function sesRequest($phplistmailer, $messageheader, $messagebody)
+    {
+        $messageheader = preg_replace('/' . $phplistmailer->LE . '$/', '', $messageheader);
+        $messageheader .= $phplistmailer->LE . 'Subject: ' . $phplistmailer->EncodeHeader($phplistmailer->Subject) . $phplistmailer->LE;
+        
+        $rawMessage = base64_encode($messageheader . $phplistmailer->LE . $phplistmailer->LE . $messagebody);
+        $sesRequest = array(
+            'Action' => 'SendRawEmail',
+            'Source' => $GLOBALS['message_envelope'],
+            'Destinations.member.1' => $phplistmailer->destinationemail,
+            'RawMessage.Data' => $rawMessage,
+        );
+
+        return $sesRequest;
+    }
+
+    private function httpHeaders()
+    {
+        $date = date('r');
+        $aws_signature = base64_encode(hash_hmac('sha256', $date, getConfig('amazonses_secret_key'), true));
+
+        $httpHeaders = array(
+            'Host: ' . parse_url(getConfig('amazonses_endpoint'), PHP_URL_HOST),
+            'Content-Type: application/x-www-form-urlencoded',
+            'Date: ' . $date,
+            sprintf(
+                'X-Amzn-Authorization: AWS3-HTTPS AWSAccessKeyId=%s,Algorithm=HMACSHA256,Signature=%s',
+                getConfig('amazonses_access_key'),
+                $aws_signature
+            ),
+            'Connection: keep-alive',
+            'Keep-Alive: 300',
+        );
+
+        return $httpHeaders;
+    }
+
     /**
      * Constructor.
      */
@@ -95,7 +132,6 @@ class AmazonSes extends phplistPlugin
      */
     public function send($phplistmailer, $messageheader, $messagebody)
     {
-        
         static $curl = null;
 
         if ($curl === null) {
@@ -111,31 +147,9 @@ class AmazonSes extends phplistPlugin
             curl_setopt($curl, CURLOPT_POST, 1);
         }
 
-        $messageheader = preg_replace('/' . $phplistmailer->LE . '$/', '', $messageheader);
-        $messageheader .= $phplistmailer->LE . 'Subject: ' . $phplistmailer->EncodeHeader($phplistmailer->Subject) . $phplistmailer->LE;
-
-        $date = date('r');
-        $aws_signature = base64_encode(hash_hmac('sha256', $date, getConfig('amazonses_secret_key'), true));
-
-        $requestheader = array(
-            'Host: ' . parse_url(getConfig('amazonses_endpoint'), PHP_URL_HOST),
-            'Content-Type: application/x-www-form-urlencoded',
-            'Date: ' . $date,
-            'X-Amzn-Authorization: AWS3-HTTPS AWSAccessKeyId=' . getConfig('amazonses_access_key') . ',Algorithm=HMACSHA256,Signature=' . $aws_signature,
-            'Connection: keep-alive',
-            'Keep-Alive: 300',
-        );
-        curl_setopt($curl, CURLOPT_HTTPHEADER, $requestheader);
-
-        $rawmessage = base64_encode($messageheader . $phplistmailer->LE . $phplistmailer->LE . $messagebody);
-        $requestdata = array(
-            'Action' => 'SendRawEmail',
-            'Source' => $GLOBALS['message_envelope'],
-            'Destinations.member.1' => $phplistmailer->destinationemail,
-            'RawMessage.Data' => $rawmessage,
-        );
-        $data = http_build_query($requestdata, null, '&');
-        curl_setopt($curl, CURLOPT_POSTFIELDS, $data);
+        curl_setopt($curl, CURLOPT_HTTPHEADER, $this->httpHeaders());
+        $sesRequest = $this->sesRequest($phplistmailer, $messageheader, $messagebody);
+        curl_setopt($curl, CURLOPT_POSTFIELDS, http_build_query($sesRequest, null, '&'));
 
         $res = curl_exec($curl);
         $status = curl_getinfo($curl, CURLINFO_HTTP_CODE);
