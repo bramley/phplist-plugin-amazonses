@@ -1,2 +1,8 @@
 .php_cs.cache
 README.html
+
+## Composer ##
+plugins/AmazonSes/vendor/jmathai/php-multi-curl/*
+!plugins/AmazonSes/vendor/jmathai/php-multi-curl/LICENSE
+!plugins/AmazonSes/vendor/jmathai/php-multi-curl/src/
+plugins/AmazonSes/vendor/jmathai/php-multi-curl/src/example.php

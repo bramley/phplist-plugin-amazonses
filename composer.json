@@ -1,0 +1,9 @@
+{
+    "config": {
+        "vendor-dir": "plugins/AmazonSes/vendor",
+        "prepend-autoloader": false
+    },
+    "require": {
+        "jmathai/php-multi-curl": "dev-master"
+    }
+}

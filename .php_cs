@@ -1,7 +1,7 @@
 <?php
 
 $finder = Symfony\CS\Finder\DefaultFinder::create()
-    ->exclude('plugins/SendGridPlugin/vendor')
+    ->exclude('plugins/AmazonSes/vendor')
     ->in(__DIR__)
 ;
 
