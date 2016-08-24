@@ -70,7 +70,9 @@ class AmazonSes extends phplistPlugin
         ],
         'amazonses_multi_limit' => [
             'value' => 4,
-            'description' => 'The maximum number of emails to send concurrently when using curl_multi',
+            'min' => 2,
+            'max' => 32,
+            'description' => 'The maximum number of emails to send concurrently when using curl_multi, (between 2 and 32)',
             'type' => 'integer',
             'allowempty' => false,
             'category' => 'Amazon SES',
@@ -259,11 +261,6 @@ class AmazonSes extends phplistPlugin
                 logEvent(sprintf('Amazon SES status %s email %s', $code, $call['email']));
             }
         }
-
-        //if (class_exists('\phpList\plugin\Common\Logger')) {
-            //$logger = \phpList\plugin\Common\Logger::instance();
-            //$logger->debug($this->mc->getSequence()->renderAscii());
-        //}
     }
 
     /**
