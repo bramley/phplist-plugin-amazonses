@@ -1,0 +1,8 @@
+version 1.0.1+20161214
+      Improve handling of outstanding transfers when process exits.
+
+version 1.0.0+20160824
+      Initial version using core phplist code
+      Send emails concurrently using multi curl
+      Correct min and max for number of concurrent connections
+

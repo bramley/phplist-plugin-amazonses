@@ -27,6 +27,8 @@ class AmazonSes extends phplistPlugin
 {
     const VERSION_FILE = 'version.txt';
 
+    private $totalSuccess = 0;
+    private $totalFailure = 0;
     private $useMulti = false;
     private $multiLimit = 0;
     private $mc = null;
@@ -63,7 +65,7 @@ class AmazonSes extends phplistPlugin
         ],
         'amazonses_multi' => [
             'value' => false,
-            'description' => 'Whether to use curl_multi to send emails concurrently',
+            'description' => 'Whether to use curl multi to send emails concurrently',
             'type' => 'boolean',
             'allowempty' => true,
             'category' => 'Amazon SES',
@@ -72,9 +74,16 @@ class AmazonSes extends phplistPlugin
             'value' => 4,
             'min' => 2,
             'max' => 32,
-            'description' => 'The maximum number of emails to send concurrently when using curl_multi, (between 2 and 32)',
+            'description' => 'The maximum number of emails to send concurrently when using curl multi, (between 2 and 32)',
             'type' => 'integer',
             'allowempty' => false,
+            'category' => 'Amazon SES',
+        ],
+        'amazonses_multi_log' => [
+            'value' => false,
+            'description' => 'Whether to create a log file showing all curl multi transfers',
+            'type' => 'boolean',
+            'allowempty' => true,
             'category' => 'Amazon SES',
         ],
     ];
@@ -131,6 +140,42 @@ class AmazonSes extends phplistPlugin
     }
 
     /**
+     * Waits for a call to complete.
+     * 
+     * @param array $call
+     */
+    private function waitForCallToComplete(array $call)
+    {
+        $manager = $call['manager'];
+        $code = $manager->code;
+
+        if ($code == 200) {
+            ++$this->totalSuccess;
+        } else {
+            ++$this->totalFailure;
+            logEvent(sprintf('Amazon SES status %s email %s', $code, $call['email']));
+        }
+    }
+
+    /**
+     * Waits for each outstanding call to complete.
+     * Writes the sequence of calls to a log file.
+     */
+    private function completeCalls()
+    {
+        global $tmpdir;
+
+        while (count($this->calls) > 0) {
+            $this->waitForCallToComplete(array_shift($this->calls));
+        }
+
+        if (getConfig('amazonses_multi_log')) {
+            file_put_contents("$tmpdir/multicurl.log", $this->mc->getSequence()->renderAscii());
+        }
+        logEvent(sprintf('Amazon SES multi-curl successes: %d, failures: %d', $this->totalSuccess, $this->totalFailure));
+    }
+
+    /**
      * Send an email using the Amazon SES API.
      * This method uses curl multi to send multiple emails concurrently.
      *
@@ -152,13 +197,7 @@ class AmazonSes extends phplistPlugin
          * to complete
          */
         if (count($this->calls) == $this->multiLimit) {
-            $call = array_shift($this->calls);
-            $manager = $call['manager'];
-            $code = $manager->code;
-
-            if ($code != 200) {
-                logEvent(sprintf('Amazon SES status %s email %s', $code, $call['email']));
-            }
+            $this->waitForCallToComplete(array_shift($this->calls));
         }
 
         $curl = $this->initialiseCurl();
@@ -229,8 +268,8 @@ class AmazonSes extends phplistPlugin
     public function activate()
     {
         parent::activate();
-        $this->useMulti = getConfig('amazonses_multi');
-        $this->multiLimit = getConfig('amazonses_multi_limit');
+        $this->useMulti = (bool) getConfig('amazonses_multi');
+        $this->multiLimit = (int) getConfig('amazonses_multi_limit');
     }
 
     /**
@@ -240,26 +279,23 @@ class AmazonSes extends phplistPlugin
      */
     public function dependencyCheck()
     {
-        global $plugins;
-
         return [
             'PHP version 5.4.0 or greater' => version_compare(PHP_VERSION, '5.4') > 0,
             'curl extension installed' => extension_loaded('curl'),
+            'Common Plugin installed' => phpListPlugin::isEnabled('CommonPlugin'),
         ];
     }
 
     /**
-     * Shutdown handler to ensure that all transfers complete.
+     * Complete any outstanding multi-curl calls.
+     * Any emails sent after this point will use single send.
      */
     public function shutdown()
     {
-        while (count($this->calls) > 0) {
-            $call = array_shift($this->calls);
-            $code = $call['manager']->code;
-
-            if ($code != 200) {
-                logEvent(sprintf('Amazon SES status %s email %s', $code, $call['email']));
-            }
+        if ($this->mc !== null) {
+            $this->completeCalls();
+            $this->mc = null;
+            $this->useMulti = false;
         }
     }
 
@@ -280,5 +316,16 @@ class AmazonSes extends phplistPlugin
         return $this->useMulti
             ? $this->multiSend($phplistmailer, $messageheader, $messagebody)
             : $this->singleSend($phplistmailer, $messageheader, $messagebody);
+    }
+
+    /**
+     * This hook is called within the processqueue shutdown() function.
+     * 
+     * For command line processqueue phplist exits in its shutdown function
+     * therefore need to explicitly call our plugin
+     */
+    public function processSendStats($sent = 0, $invalid = 0, $failed_sent = 0, $unconfirmed = 0, $counters = array())
+    {
+        $this->shutdown();
     }
 }
