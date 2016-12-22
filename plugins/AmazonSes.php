@@ -86,11 +86,22 @@ class AmazonSes extends phplistPlugin
             'allowempty' => true,
             'category' => 'Amazon SES',
         ],
+        'amazonses_curl_verbose' => [
+            'value' => false,
+            'description' => 'Whether to generate verbose curl output (use only for debugging)',
+            'type' => 'boolean',
+            'allowempty' => true,
+            'category' => 'Amazon SES',
+        ],
     ];
 
     private function initialiseCurl()
     {
-        $curl = curl_init();
+        global $tmpdir;
+
+        if (($curl = curl_init()) === false) {
+            throw new Exception('Amazon SES unable to create curl handle');
+        }
         curl_setopt($curl, CURLOPT_URL, getConfig('amazonses_endpoint'));
         curl_setopt($curl, CURLOPT_TIMEOUT, 30);
         curl_setopt($curl, CURLOPT_RETURNTRANSFER, 1);
@@ -100,6 +111,12 @@ class AmazonSes extends phplistPlugin
         curl_setopt($curl, CURLOPT_DNS_USE_GLOBAL_CACHE, true);
         curl_setopt($curl, CURLOPT_USERAGENT, NAME . ' (phpList version ' . VERSION . ', http://www.phplist.com/)');
         curl_setopt($curl, CURLOPT_POST, 1);
+
+        if (getConfig('amazonses_curl_verbose')) {
+            curl_setopt($curl, CURLOPT_VERBOSE, true);
+            $log = fopen(sprintf('%s/curl_%s.log', $tmpdir, date('Y-m-d')), 'a+');
+            curl_setopt($curl, CURLOPT_STDERR, $log);
+        }
 
         return $curl;
     }
@@ -134,8 +151,8 @@ class AmazonSes extends phplistPlugin
                 getConfig('amazonses_access_key'),
                 $aws_signature
             ),
-            'Connection: keep-alive',
-            'Keep-Alive: 300',
+            //~ 'Connection: keep-alive',
+            //~ 'Keep-Alive: 300',
         ];
     }
 
@@ -240,9 +257,9 @@ class AmazonSes extends phplistPlugin
 
         if ($res === false || $status != 200) {
             $error = curl_error($curl);
+            logEvent(sprintf('Amazon SES status: %s, result: %s, curl error: %s', $status, strip_tags($res), $error));
             curl_close($curl);
             $curl = null;
-            logEvent('Amazon SES status ' . $status . ' ' . strip_tags($res) . ' ' . $error);
 
             return false;
         }
@@ -313,9 +330,16 @@ class AmazonSes extends phplistPlugin
      */
     public function send($phplistmailer, $messageheader, $messagebody)
     {
-        return $this->useMulti
-            ? $this->multiSend($phplistmailer, $messageheader, $messagebody)
-            : $this->singleSend($phplistmailer, $messageheader, $messagebody);
+        try {
+            return $this->useMulti
+                ? $this->multiSend($phplistmailer, $messageheader, $messagebody)
+                : $this->singleSend($phplistmailer, $messageheader, $messagebody);
+        } catch (Exception $e) {
+            logEvent($e->getMessage());
+
+            return false;
+        }
+
     }
 
     /**
