@@ -16,14 +16,20 @@
  * @category  phplist
  * 
  * @author    Duncan Cameron
- * @copyright 2016 Duncan Cameron
+ * @copyright 2016-2017 Duncan Cameron
  * @license   http://www.gnu.org/licenses/gpl.html GNU General Public License, Version 3
  */
 
 /**
  * Registers the plugin with phplist.
  */
-class AmazonSes extends phplistPlugin
+if (!interface_exists('EmailSender')) {
+    echo 'AmazonSes plugin requires phplist 3.3.0+';
+
+    return;
+}
+
+class AmazonSes extends phplistPlugin implements EmailSender
 {
     const VERSION_FILE = 'version.txt';
 
@@ -126,7 +132,6 @@ class AmazonSes extends phplistPlugin
         global $message_envelope;
 
         $messageheader = preg_replace('/' . $phplistmailer->LE . '$/', '', $messageheader);
-        $messageheader .= $phplistmailer->LE . 'Subject: ' . $phplistmailer->EncodeHeader($phplistmailer->Subject) . $phplistmailer->LE;
         $rawMessage = base64_encode($messageheader . $phplistmailer->LE . $phplistmailer->LE . $messagebody);
 
         return [
@@ -140,19 +145,17 @@ class AmazonSes extends phplistPlugin
     private function httpHeaders()
     {
         $date = date('r');
-        $aws_signature = base64_encode(hash_hmac('sha256', $date, getConfig('amazonses_secret_key'), true));
+        $aws_signature = base64_encode(hash_hmac('sha256', $date, $this->secretKey, true));
 
         return [
-            'Host: ' . parse_url(getConfig('amazonses_endpoint'), PHP_URL_HOST),
+            'Host: ' . $this->host,
             'Content-Type: application/x-www-form-urlencoded',
             'Date: ' . $date,
             sprintf(
                 'X-Amzn-Authorization: AWS3-HTTPS AWSAccessKeyId=%s,Algorithm=HMACSHA256,Signature=%s',
-                getConfig('amazonses_access_key'),
+                $this->accessKey,
                 $aws_signature
             ),
-            //~ 'Connection: keep-alive',
-            //~ 'Keep-Alive: 300',
         ];
     }
 
@@ -287,6 +290,9 @@ class AmazonSes extends phplistPlugin
         parent::activate();
         $this->useMulti = (bool) getConfig('amazonses_multi');
         $this->multiLimit = (int) getConfig('amazonses_multi_limit');
+        $this->host = parse_url(getConfig('amazonses_endpoint'), PHP_URL_HOST);
+        $this->accessKey = getConfig('amazonses_access_key');
+        $this->secretKey = getConfig('amazonses_secret_key');
     }
 
     /**
@@ -300,6 +306,7 @@ class AmazonSes extends phplistPlugin
             'PHP version 5.4.0 or greater' => version_compare(PHP_VERSION, '5.4') > 0,
             'curl extension installed' => extension_loaded('curl'),
             'Common Plugin installed' => phpListPlugin::isEnabled('CommonPlugin'),
+            'phpList 3.3.0 or greater' => version_compare(VERSION, '3.3') > 0,
         ];
     }
 
@@ -328,7 +335,7 @@ class AmazonSes extends phplistPlugin
      *
      * @return bool success/failure
      */
-    public function send($phplistmailer, $messageheader, $messagebody)
+    public function send(PHPlistMailer $phplistmailer, $messageheader, $messagebody)
     {
         try {
             return $this->useMulti
