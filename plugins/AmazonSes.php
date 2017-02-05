@@ -1,7 +1,7 @@
 <?php
 /**
  * AmazonSes plugin for phplist.
- * 
+ *
  * This file is a part of AmazonSes Plugin.
  *
  * This plugin is free software: you can redistribute it and/or modify
@@ -12,9 +12,9 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- * 
+ *
  * @category  phplist
- * 
+ *
  * @author    Duncan Cameron
  * @copyright 2016-2017 Duncan Cameron
  * @license   http://www.gnu.org/licenses/gpl.html GNU General Public License, Version 3
@@ -161,7 +161,7 @@ class AmazonSes extends phplistPlugin implements EmailSender
 
     /**
      * Waits for a call to complete.
-     * 
+     *
      * @param array $call
      */
     private function waitForCallToComplete(array $call)
@@ -327,8 +327,8 @@ class AmazonSes extends phplistPlugin implements EmailSender
      * Send an email using the Amazon SES API.
      * This method redirects to send single or multiple emails.
      *
-     * @see 
-     * 
+     * @see
+     *
      * @param PHPlistMailer $phplistmailer mailer instance
      * @param string        $messageheader the message http headers
      * @param string        $messagebody   the message body
@@ -346,12 +346,11 @@ class AmazonSes extends phplistPlugin implements EmailSender
 
             return false;
         }
-
     }
 
     /**
      * This hook is called within the processqueue shutdown() function.
-     * 
+     *
      * For command line processqueue phplist exits in its shutdown function
      * therefore need to explicitly call our plugin
      */
