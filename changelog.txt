@@ -1,3 +1,7 @@
+version 1.2.0+20170929
+      Use MailSender class to send emails
+      Remove the multicurl package
+
 version 1.1.0+20170315
       Improve error reporting
       Integrate with phplist by implementing the EmailSender interface

@@ -33,12 +33,7 @@ class AmazonSes extends phplistPlugin implements EmailSender
 {
     const VERSION_FILE = 'version.txt';
 
-    private $totalSuccess = 0;
-    private $totalFailure = 0;
-    private $useMulti = false;
-    private $multiLimit = 0;
-    private $mc = null;
-    private $calls = [];
+    private $mailSender;
 
     /*
      *  Inherited variables
@@ -101,175 +96,6 @@ class AmazonSes extends phplistPlugin implements EmailSender
         ],
     ];
 
-    private function initialiseCurl()
-    {
-        global $tmpdir;
-
-        if (($curl = curl_init()) === false) {
-            throw new Exception('Amazon SES unable to create curl handle');
-        }
-        curl_setopt($curl, CURLOPT_URL, getConfig('amazonses_endpoint'));
-        curl_setopt($curl, CURLOPT_TIMEOUT, 30);
-        curl_setopt($curl, CURLOPT_RETURNTRANSFER, 1);
-        curl_setopt($curl, CURLOPT_SSL_VERIFYPEER, false);
-        curl_setopt($curl, CURLOPT_SSL_VERIFYHOST, false);
-        curl_setopt($curl, CURLOPT_HEADER, 1);
-        curl_setopt($curl, CURLOPT_DNS_USE_GLOBAL_CACHE, true);
-        curl_setopt($curl, CURLOPT_USERAGENT, NAME . ' (phpList version ' . VERSION . ', http://www.phplist.com/)');
-        curl_setopt($curl, CURLOPT_POST, 1);
-
-        if (getConfig('amazonses_curl_verbose')) {
-            curl_setopt($curl, CURLOPT_VERBOSE, true);
-            $log = fopen(sprintf('%s/curl_%s.log', $tmpdir, date('Y-m-d')), 'a+');
-            curl_setopt($curl, CURLOPT_STDERR, $log);
-        }
-
-        return $curl;
-    }
-
-    private function sesRequest($phplistmailer, $messageheader, $messagebody)
-    {
-        global $message_envelope;
-
-        $messageheader = preg_replace('/' . $phplistmailer->LE . '$/', '', $messageheader);
-        $rawMessage = base64_encode($messageheader . $phplistmailer->LE . $phplistmailer->LE . $messagebody);
-
-        return [
-            'Action' => 'SendRawEmail',
-            'Source' => $message_envelope,
-            'Destinations.member.1' => $phplistmailer->destinationemail,
-            'RawMessage.Data' => $rawMessage,
-        ];
-    }
-
-    private function httpHeaders()
-    {
-        $date = date('r');
-        $aws_signature = base64_encode(hash_hmac('sha256', $date, $this->secretKey, true));
-
-        return [
-            'Host: ' . $this->host,
-            'Content-Type: application/x-www-form-urlencoded',
-            'Date: ' . $date,
-            sprintf(
-                'X-Amzn-Authorization: AWS3-HTTPS AWSAccessKeyId=%s,Algorithm=HMACSHA256,Signature=%s',
-                $this->accessKey,
-                $aws_signature
-            ),
-        ];
-    }
-
-    /**
-     * Waits for a call to complete.
-     *
-     * @param array $call
-     */
-    private function waitForCallToComplete(array $call)
-    {
-        $manager = $call['manager'];
-        $code = $manager->code;
-
-        if ($code == 200) {
-            ++$this->totalSuccess;
-        } else {
-            ++$this->totalFailure;
-            logEvent(sprintf('Amazon SES status %s email %s', $code, $call['email']));
-        }
-    }
-
-    /**
-     * Waits for each outstanding call to complete.
-     * Writes the sequence of calls to a log file.
-     */
-    private function completeCalls()
-    {
-        global $tmpdir;
-
-        while (count($this->calls) > 0) {
-            $this->waitForCallToComplete(array_shift($this->calls));
-        }
-
-        if (getConfig('amazonses_multi_log')) {
-            file_put_contents("$tmpdir/multicurl.log", $this->mc->getSequence()->renderAscii());
-        }
-        logEvent(sprintf('Amazon SES multi-curl successes: %d, failures: %d', $this->totalSuccess, $this->totalFailure));
-    }
-
-    /**
-     * Send an email using the Amazon SES API.
-     * This method uses curl multi to send multiple emails concurrently.
-     *
-     * @param PHPlistMailer $phplistmailer mailer instance
-     * @param string        $messageheader the message http headers
-     * @param string        $messagebody   the message body
-     *
-     * @return bool success/failure
-     */
-    private function multiSend($phplistmailer, $messageheader, $messagebody)
-    {
-        if ($this->mc === null) {
-            $this->mc = JMathai\PhpMultiCurl\MultiCurl::getInstance();
-            register_shutdown_function([$this, 'shutdown']);
-        }
-
-        /*
-         * if the limit has been reached then wait for the oldest call
-         * to complete
-         */
-        if (count($this->calls) == $this->multiLimit) {
-            $this->waitForCallToComplete(array_shift($this->calls));
-        }
-
-        $curl = $this->initialiseCurl();
-        curl_setopt($curl, CURLOPT_HTTPHEADER, $this->httpHeaders());
-        $sesRequest = $this->sesRequest($phplistmailer, $messageheader, $messagebody);
-        curl_setopt($curl, CURLOPT_POSTFIELDS, http_build_query($sesRequest, null, '&'));
-
-        $this->calls[] = [
-            'manager' => $this->mc->addCurl($curl),
-            'email' => $phplistmailer->destinationemail,
-        ];
-
-        return true;
-    }
-
-    /**
-     * Send an email using the Amazon SES API.
-     * This method uses curl directly with an optimisation of re-using
-     * the curl handle.
-     *
-     * @param PHPlistMailer $phplistmailer mailer instance
-     * @param string        $messageheader the message http headers
-     * @param string        $messagebody   the message body
-     *
-     * @return bool success/failure
-     */
-    private function singleSend($phplistmailer, $messageheader, $messagebody)
-    {
-        static $curl = null;
-
-        if ($curl === null) {
-            $curl = $this->initialiseCurl();
-        }
-        curl_setopt($curl, CURLOPT_HTTPHEADER, $this->httpHeaders());
-        $sesRequest = $this->sesRequest($phplistmailer, $messageheader, $messagebody);
-        curl_setopt($curl, CURLOPT_POSTFIELDS, http_build_query($sesRequest, null, '&'));
-
-        $res = curl_exec($curl);
-        $status = curl_getinfo($curl, CURLINFO_HTTP_CODE);
-
-        if ($res === false || $status != 200) {
-            $error = curl_error($curl);
-            logEvent(sprintf('Amazon SES status: %s, result: %s, curl error: %s', $status, strip_tags($res), $error));
-            curl_close($curl);
-            $curl = null;
-
-            return false;
-        }
-
-        return true;
-    }
-
     /**
      * Constructor.
      */
@@ -283,51 +109,27 @@ class AmazonSes extends phplistPlugin implements EmailSender
     }
 
     /**
-     * On plugin activation.
-     */
-    public function activate()
-    {
-        parent::activate();
-        $this->useMulti = (bool) getConfig('amazonses_multi');
-        $this->multiLimit = (int) getConfig('amazonses_multi_limit');
-        $this->host = parse_url(getConfig('amazonses_endpoint'), PHP_URL_HOST);
-        $this->accessKey = getConfig('amazonses_access_key');
-        $this->secretKey = getConfig('amazonses_secret_key');
-    }
-
-    /**
      * Provide the dependencies for enabling this plugin.
      *
      * @return array
      */
     public function dependencyCheck()
     {
+        global $emailsenderplugin, $plugins;
+
         return [
             'PHP version 5.4.0 or greater' => version_compare(PHP_VERSION, '5.4') > 0,
+            'No other plugin to send emails can be enabled' => empty($emailsenderplugin) || get_class($emailsenderplugin) == __CLASS__,
             'curl extension installed' => extension_loaded('curl'),
-            'Common Plugin installed' => phpListPlugin::isEnabled('CommonPlugin'),
+            'Common Plugin version 3.7.0 or later installed' => (
+                phpListPlugin::isEnabled('CommonPlugin') && version_compare($plugins['CommonPlugin']->version, '3.7.0') >= 0
+            ),
             'phpList 3.3.0 or greater' => version_compare(VERSION, '3.3') > 0,
         ];
     }
 
     /**
-     * Complete any outstanding multi-curl calls.
-     * Any emails sent after this point will use single send.
-     */
-    public function shutdown()
-    {
-        if ($this->mc !== null) {
-            $this->completeCalls();
-            $this->mc = null;
-            $this->useMulti = false;
-        }
-    }
-
-    /**
      * Send an email using the Amazon SES API.
-     * This method redirects to send single or multiple emails.
-     *
-     * @see
      *
      * @param PHPlistMailer $phplistmailer mailer instance
      * @param string        $messageheader the message http headers
@@ -337,25 +139,34 @@ class AmazonSes extends phplistPlugin implements EmailSender
      */
     public function send(PHPlistMailer $phplistmailer, $messageheader, $messagebody)
     {
-        try {
-            return $this->useMulti
-                ? $this->multiSend($phplistmailer, $messageheader, $messagebody)
-                : $this->singleSend($phplistmailer, $messageheader, $messagebody);
-        } catch (Exception $e) {
-            logEvent($e->getMessage());
+        if ($this->mailSender === null) {
+            $client = new phpList\plugin\AmazonSes\MailClient(
+                parse_url(getConfig('amazonses_endpoint'), PHP_URL_HOST),
+                getConfig('amazonses_access_key'),
+                getConfig('amazonses_secret_key')
+            );
 
-            return false;
+            $this->mailSender = new phpList\plugin\Common\MailSender(
+                $client,
+                (bool) getConfig('amazonses_multi'),
+                (int) getConfig('amazonses_multi_limit'),
+                (bool) getConfig('amazonses_multi_log'),
+                (bool) getConfig('amazonses_curl_verbose'),
+                true
+            );
         }
+
+        return $this->mailSender->send($phplistmailer, $messageheader, $messagebody);
     }
 
     /**
      * This hook is called within the processqueue shutdown() function.
      *
      * For command line processqueue phplist exits in its shutdown function
-     * therefore need to explicitly call our plugin
+     * therefore need to explicitly call the mailsender shutdown method.
      */
     public function processSendStats($sent = 0, $invalid = 0, $failed_sent = 0, $unconfirmed = 0, $counters = array())
     {
-        $this->shutdown();
+        $this->mailSender->shutdown();
     }
 }

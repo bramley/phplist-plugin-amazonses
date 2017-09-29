@@ -53,6 +53,7 @@ This plugin is free but if you install and find it useful then a donation to sup
 ## Version history ##
 
     version     Description
+    1.2.0+20170929  Use generic class to send emails
     1.1.0+20170315  Integrate with phplist by implementing the EmailSender interface
                     Release on GitHub
     1.0.1+20161214  Improve handling of outstanding transfers when process exits
