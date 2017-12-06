@@ -43,16 +43,16 @@ class AmazonSes extends phplistPlugin implements EmailSender
     public $description = 'Use Amazon SES to send emails';
     public $documentationUrl = 'https://resources.phplist.com/plugin/amazonses';
     public $settings = [
-        'amazonses_secret_key' => [
+        'amazonses_access_key' => [
             'value' => '',
-            'description' => 'AWS secret access key',
+            'description' => 'AWS access key ID',
             'type' => 'text',
             'allowempty' => false,
             'category' => 'Amazon SES',
         ],
-        'amazonses_access_key' => [
+        'amazonses_secret_key' => [
             'value' => '',
-            'description' => 'AWS access key ID',
+            'description' => 'AWS secret access key',
             'type' => 'text',
             'allowempty' => false,
             'category' => 'Amazon SES',

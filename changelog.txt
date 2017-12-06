@@ -1,3 +1,6 @@
+version 1.2.1+20171206
+      Change order of access key id and secret access key on the Settings page
+
 version 1.2.0+20170929
       Use MailSender class to send emails
       Remove the multicurl package
