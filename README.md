@@ -53,6 +53,7 @@ This plugin is free but if you install and find it useful then a donation to sup
 ## Version history ##
 
     version     Description
+    1.2.3+20191102  Remove dependency on phpmailer line-ending
     1.2.2+20190213  Minor internal code change
     1.2.1+20171206  Change order of access key id and secret access key on the Settings page
     1.2.0+20170929  Use generic class to send emails

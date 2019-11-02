@@ -47,8 +47,8 @@ class MailClient implements \phpList\plugin\Common\IMailClient
     {
         global $message_envelope;
 
-        $messageheader = preg_replace('/' . $phplistmailer->LE . '$/', '', $messageheader);
-        $rawMessage = base64_encode($messageheader . $phplistmailer->LE . $phplistmailer->LE . $messagebody);
+        $messageheader = rtrim($messageheader, "\r\n ");
+        $rawMessage = base64_encode($messageheader . "\r\n\r\n" . $messagebody);
 
         $request = [
             'Action' => 'SendRawEmail',
