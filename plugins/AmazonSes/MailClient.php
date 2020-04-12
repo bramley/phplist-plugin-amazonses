@@ -22,6 +22,8 @@
 
 namespace phpList\plugin\AmazonSes;
 
+use phpList\plugin\Common\Logger;
+
 /**
  * This class is a client of the generic MailSender class and provides the request
  * data specific to the Amazon SES API.
@@ -33,14 +35,16 @@ namespace phpList\plugin\AmazonSes;
 class MailClient implements \phpList\plugin\Common\IMailClient
 {
     private $host;
-    private $accesskey;
+    private $accessKey;
     private $secretKey;
 
-    public function __construct($host, $accessKey, $secretKey)
+    public function __construct($host, $region, $accessKey, $secretKey)
     {
         $this->host = $host;
+        $this->region = $region;
         $this->accessKey = $accessKey;
         $this->secretKey = $secretKey;
+        $this->logger = Logger::instance();
     }
 
     public function requestBody(\PHPlistMailer $phplistmailer, $messageheader, $messagebody)
@@ -62,19 +66,13 @@ class MailClient implements \phpList\plugin\Common\IMailClient
 
     public function httpHeaders()
     {
-        $date = date('r');
-        $aws_signature = base64_encode(hash_hmac('sha256', $date, $this->secretKey, true));
+        list($messageheader, $messagebody) = func_get_args();
+        $httpHeaders = $this->sign($messagebody);
+        $httpHeaders[] = 'Host: ' . $this->host;
+        $httpHeaders[] = 'Content-Type: application/x-www-form-urlencoded';
+        $httpHeaders[] = 'Date: ' . date('r');
 
-        return [
-            'Host: ' . $this->host,
-            'Content-Type: application/x-www-form-urlencoded',
-            'Date: ' . $date,
-            sprintf(
-                'X-Amzn-Authorization: AWS3-HTTPS AWSAccessKeyId=%s,Algorithm=HMACSHA256,Signature=%s',
-                $this->accessKey,
-                $aws_signature
-            ),
-        ];
+        return $httpHeaders;
     }
 
     public function endpoint()
@@ -85,5 +83,63 @@ class MailClient implements \phpList\plugin\Common\IMailClient
     public function verifyResponse($response)
     {
         return true;
+    }
+
+    private function sign($body)
+    {
+        $date = new \DateTime('UTC');
+        $shortDate = $date->format('Ymd');
+        $longDate = $date->format('Ymd\THis\Z');
+        $algorithm = 'AWS4-HMAC-SHA256';
+        $hashAlgorithm = 'sha256';
+        $service = 'ses';
+        $scope = "$shortDate/$this->region/$service/aws4_request";
+
+        $canonicalFields = [
+            'POST',
+            '/',
+            '',
+        ];
+        $canonicalHeaders = [
+            'host' => $this->host,
+            'x-amz-date' => $longDate,
+        ];
+
+        foreach ($canonicalHeaders as $k => $v) {
+            $canonicalFields[] = $k . ':' . $v;
+        }
+        $canonicalFields[] = '';
+        $canonicalFields[] = implode(';', array_keys($canonicalHeaders));
+        $canonicalFields[] = hash($hashAlgorithm, $body);
+        $canonicalRequest = implode("\n", $canonicalFields);
+
+        $fieldsToSign = [
+            $algorithm,
+            $longDate,
+            $scope,
+            hash($hashAlgorithm, $canonicalRequest),
+        ];
+        $stringToSign = implode("\n", $fieldsToSign);
+
+        // calculate the signature
+        $dateKey = hash_hmac($hashAlgorithm, $shortDate, 'AWS4' . $this->secretKey, true);
+        $regionKey = hash_hmac($hashAlgorithm, $this->region, $dateKey, true);
+        $serviceKey = hash_hmac($hashAlgorithm, $service, $regionKey, true);
+        $signingKey = hash_hmac($hashAlgorithm, 'aws4_request', $serviceKey, true);
+        $signature = hash_hmac($hashAlgorithm, $stringToSign, $signingKey);
+
+        $authorization = sprintf(
+            '%s Credential=%s/%s,SignedHeaders=%s,Signature=%s',
+            $algorithm,
+            $this->accessKey,
+            $scope,
+            implode(';', array_keys($canonicalHeaders)),
+            $signature
+        );
+
+        return [
+            'X-Amz-Date: ' . $longDate,
+            'Authorization: ' . $authorization,
+        ];
     }
 }

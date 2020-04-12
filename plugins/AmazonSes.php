@@ -57,6 +57,13 @@ class AmazonSes extends phplistPlugin implements EmailSender
             'allowempty' => false,
             'category' => 'Amazon SES',
         ],
+        'amazonses_region' => [
+            'value' => 'us-east-1',
+            'description' => 'SES region',
+            'type' => 'text',
+            'allowempty' => false,
+            'category' => 'Amazon SES',
+        ],
         'amazonses_endpoint' => [
             'value' => 'https://email.us-east-1.amazonaws.com/',
             'description' => 'SES endpoint',
@@ -121,8 +128,8 @@ class AmazonSes extends phplistPlugin implements EmailSender
             'PHP version 5.4.0 or greater' => version_compare(PHP_VERSION, '5.4') > 0,
             'No other plugin to send emails can be enabled' => empty($emailsenderplugin) || get_class($emailsenderplugin) == __CLASS__,
             'curl extension installed' => extension_loaded('curl'),
-            'Common Plugin version 3.7.0 or later installed' => (
-                phpListPlugin::isEnabled('CommonPlugin') && version_compare($plugins['CommonPlugin']->version, '3.7.0') >= 0
+            'Common Plugin version 3.12.0 or later installed' => (
+                phpListPlugin::isEnabled('CommonPlugin') && version_compare($plugins['CommonPlugin']->version, '3.12.0') >= 0
             ),
             'phpList 3.3.0 or greater' => version_compare(VERSION, '3.3') > 0,
         ];
@@ -142,6 +149,7 @@ class AmazonSes extends phplistPlugin implements EmailSender
         if ($this->mailSender === null) {
             $client = new phpList\plugin\AmazonSes\MailClient(
                 parse_url(getConfig('amazonses_endpoint'), PHP_URL_HOST),
+                getConfig('amazonses_region'),
                 getConfig('amazonses_access_key'),
                 getConfig('amazonses_secret_key')
             );
