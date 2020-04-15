@@ -34,6 +34,9 @@ use phpList\plugin\Common\Logger;
  */
 class MailClient implements \phpList\plugin\Common\IMailClient
 {
+    const AMZ_ALGORITHM = 'AWS4-HMAC-SHA256';
+    const HASH_ALGORITHM = 'sha256';
+
     private $host;
     private $accessKey;
     private $secretKey;
@@ -67,7 +70,7 @@ class MailClient implements \phpList\plugin\Common\IMailClient
     public function httpHeaders()
     {
         list($messageheader, $messagebody) = func_get_args();
-        $httpHeaders = $this->sign($messagebody);
+        $httpHeaders = $this->authorisationHeaders($messagebody);
         $httpHeaders[] = 'Host: ' . $this->host;
         $httpHeaders[] = 'Content-Type: application/x-www-form-urlencoded';
         $httpHeaders[] = 'Date: ' . date('r');
@@ -85,13 +88,10 @@ class MailClient implements \phpList\plugin\Common\IMailClient
         return true;
     }
 
-    private function sign($body)
+    private function authorisationHeaders($body)
     {
-        $date = new \DateTime('UTC');
-        $shortDate = $date->format('Ymd');
-        $longDate = $date->format('Ymd\THis\Z');
-        $algorithm = 'AWS4-HMAC-SHA256';
-        $hashAlgorithm = 'sha256';
+        $longDate = gmdate('Ymd\THis\Z');
+        $shortDate = substr($longDate, 0, 8);
         $service = 'ses';
         $scope = "$shortDate/$this->region/$service/aws4_request";
 
@@ -110,27 +110,20 @@ class MailClient implements \phpList\plugin\Common\IMailClient
         }
         $canonicalFields[] = '';
         $canonicalFields[] = implode(';', array_keys($canonicalHeaders));
-        $canonicalFields[] = hash($hashAlgorithm, $body);
+        $canonicalFields[] = hash(self::HASH_ALGORITHM, $body);
         $canonicalRequest = implode("\n", $canonicalFields);
-
-        $fieldsToSign = [
-            $algorithm,
-            $longDate,
-            $scope,
-            hash($hashAlgorithm, $canonicalRequest),
-        ];
-        $stringToSign = implode("\n", $fieldsToSign);
+        $toSign = implode("\n", [self::AMZ_ALGORITHM, $longDate, $scope, hash(self::HASH_ALGORITHM, $canonicalRequest)]);
 
         // calculate the signature
-        $dateKey = hash_hmac($hashAlgorithm, $shortDate, 'AWS4' . $this->secretKey, true);
-        $regionKey = hash_hmac($hashAlgorithm, $this->region, $dateKey, true);
-        $serviceKey = hash_hmac($hashAlgorithm, $service, $regionKey, true);
-        $signingKey = hash_hmac($hashAlgorithm, 'aws4_request', $serviceKey, true);
-        $signature = hash_hmac($hashAlgorithm, $stringToSign, $signingKey);
+        $dateKey = hash_hmac(self::HASH_ALGORITHM, $shortDate, 'AWS4' . $this->secretKey, true);
+        $regionKey = hash_hmac(self::HASH_ALGORITHM, $this->region, $dateKey, true);
+        $serviceKey = hash_hmac(self::HASH_ALGORITHM, $service, $regionKey, true);
+        $signingKey = hash_hmac(self::HASH_ALGORITHM, 'aws4_request', $serviceKey, true);
+        $signature = hash_hmac(self::HASH_ALGORITHM, $toSign, $signingKey);
 
         $authorization = sprintf(
             '%s Credential=%s/%s,SignedHeaders=%s,Signature=%s',
-            $algorithm,
+            self::AMZ_ALGORITHM,
             $this->accessKey,
             $scope,
             implode(';', array_keys($canonicalHeaders)),

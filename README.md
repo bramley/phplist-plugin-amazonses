@@ -53,6 +53,7 @@ This plugin is free but if you install and find it useful then a donation to sup
 ## Version history ##
 
     version     Description
+    1.3.1+20200415  Minor rework of AWS signature
     1.3.0+20200412  Use AWS Signature Version 4
     1.2.3+20191102  Remove dependency on phpmailer line-ending
     1.2.2+20190213  Minor internal code change
