@@ -128,7 +128,7 @@ class AmazonSes extends phplistPlugin implements EmailSender
             'PHP version 5.4.0 or greater' => version_compare(PHP_VERSION, '5.4') > 0,
             'No other plugin to send emails can be enabled' => empty($emailsenderplugin) || get_class($emailsenderplugin) == __CLASS__,
             'curl extension installed' => extension_loaded('curl'),
-            'Common Plugin version 3.12.0 or later installed' => (
+            'Common Plugin version 3.12.0 or later must be enabled' => (
                 phpListPlugin::isEnabled('CommonPlugin') && version_compare($plugins['CommonPlugin']->version, '3.12.0') >= 0
             ),
             'phpList 3.3.0 or greater' => version_compare(VERSION, '3.3') > 0,

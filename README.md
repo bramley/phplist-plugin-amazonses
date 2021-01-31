@@ -12,19 +12,11 @@ This plugin is for phplist 3.3.0 or later and requires php version 5.4 or later.
 
 It also requires Common Plugin and the php curl extension to be installed.
 
-### Set the plugin directory ###
-The default plugin directory is `plugins` within the admin directory.
-
-You can use a directory outside of the web root by changing the definition of `PLUGIN_ROOTDIR` in config.php.
-The benefit of this is that plugins will not be affected when you upgrade phplist.
-
 ### Install through phplist ###
 The recommended way to install is through the Plugins page (menu Config > Manage Plugins) using the package
 URL `https://github.com/bramley/phplist-plugin-amazonses/archive/master.zip`.
-The installation should create
 
-* the file AmazonSes.php
-* the directory AmazonSes
+Then enable the plugin.
 
 ### Install manually ###
 If the automatic installation does not work then you can install manually.
@@ -53,6 +45,7 @@ This plugin is free but if you install and find it useful then a donation to sup
 ## Version history ##
 
     version     Description
+    1.3.2+20210131  Revise dependency message
     1.3.1+20200415  Minor rework of AWS signature
     1.3.0+20200412  Use AWS Signature Version 4
     1.2.3+20191102  Remove dependency on phpmailer line-ending
