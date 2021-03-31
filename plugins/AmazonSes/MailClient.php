@@ -129,6 +129,10 @@ class MailClient implements \phpList\plugin\Common\IMailClient
             implode(';', array_keys($canonicalHeaders)),
             $signature
         );
+        $this->logger->debug(print_r($canonicalFields, true));
+        $this->logger->debug(print_r($canonicalRequest, true));
+        $this->logger->debug(print_r($toSign, true));
+        $this->logger->debug(print_r($signature, true));
 
         return [
             'X-Amz-Date: ' . $longDate,
