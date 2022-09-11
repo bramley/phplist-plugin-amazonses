@@ -64,7 +64,7 @@ class MailClient implements \phpList\plugin\Common\IMailClient
             'RawMessage.Data' => $rawMessage,
         ];
 
-        return http_build_query($request, null, '&');
+        return http_build_query($request, '', '&');
     }
 
     public function httpHeaders()
