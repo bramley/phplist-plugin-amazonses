@@ -37,8 +37,10 @@ class MailClient implements \phpList\plugin\Common\IMailClient
     const AMZ_ALGORITHM = 'AWS4-HMAC-SHA256';
     const HASH_ALGORITHM = 'sha256';
 
-    private $host;
     private $accessKey;
+    private $host;
+    private $logger;
+    private $region;
     private $secretKey;
 
     public function __construct($host, $region, $accessKey, $secretKey)
