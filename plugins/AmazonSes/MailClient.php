@@ -43,13 +43,13 @@ class MailClient implements \phpList\plugin\Common\IMailClient
     private $region;
     private $secretKey;
 
-    public function __construct($host, $region, $accessKey, $secretKey)
+    public function __construct($region, $accessKey, $secretKey)
     {
-        $this->host = $host;
         $this->region = $region;
         $this->accessKey = $accessKey;
         $this->secretKey = $secretKey;
         $this->logger = Logger::instance();
+        $this->host = sprintf('email.%s.amazonaws.com', $region);
     }
 
     public function requestBody(\PHPlistMailer $phplistmailer, $messageheader, $messagebody)
@@ -82,7 +82,7 @@ class MailClient implements \phpList\plugin\Common\IMailClient
 
     public function endpoint()
     {
-        return getConfig('amazonses_endpoint');
+        return sprintf('https://%s', $this->host);
     }
 
     public function verifyResponse($response)
