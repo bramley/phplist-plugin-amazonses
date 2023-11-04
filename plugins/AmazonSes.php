@@ -20,7 +20,7 @@
  * @license   http://www.gnu.org/licenses/gpl.html GNU General Public License, Version 3
  */
 
-/**
+/*
  * Registers the plugin with phplist.
  */
 if (!interface_exists('EmailSender')) {
@@ -48,7 +48,7 @@ class AmazonSes extends phplistPlugin implements EmailSender
      */
     public function __construct()
     {
-        $this->coderoot = dirname(__FILE__) . '/' . 'AmazonSes' . '/';
+        $this->coderoot = dirname(__FILE__) . '/' . __CLASS__ . '/';
         parent::__construct();
         $this->version = (is_file($f = $this->coderoot . self::VERSION_FILE))
             ? file_get_contents($f)
