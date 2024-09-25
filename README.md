@@ -45,6 +45,7 @@ This plugin is free but if you install and find it useful then a donation to sup
 ## Version history ##
 
     version     Description
+    1.4.1+20241005  Improve wording of configuration settings
     1.4.0+20231104  Choose region from a select list
     1.3.3+20220912  Minor bug fix
     1.3.2+20210131  Revise dependency message

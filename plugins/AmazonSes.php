@@ -114,7 +114,10 @@ class AmazonSes extends phplistPlugin implements EmailSender
             ],
             'amazonses_multi' => [
                 'value' => false,
-                'description' => 'Whether to use curl multi to send emails concurrently',
+                'description' => sprintf(
+                    'Whether to send emails concurrently (see <a href="%s" target="_blank">documentation</a>)',
+                    $this->documentationUrl
+                ),
                 'type' => 'boolean',
                 'allowempty' => true,
                 'category' => 'Amazon SES',
@@ -123,14 +126,14 @@ class AmazonSes extends phplistPlugin implements EmailSender
                 'value' => 4,
                 'min' => 2,
                 'max' => 32,
-                'description' => 'The maximum number of emails to send concurrently when using curl multi, (between 2 and 32)',
+                'description' => 'The maximum number of emails to send concurrently, (between 2 and 32)',
                 'type' => 'integer',
                 'allowempty' => false,
                 'category' => 'Amazon SES',
             ],
             'amazonses_multi_log' => [
                 'value' => false,
-                'description' => 'Whether to create a log file showing all curl multi transfers',
+                'description' => 'Whether to create a log file showing all concurrent transfers',
                 'type' => 'boolean',
                 'allowempty' => true,
                 'category' => 'Amazon SES',

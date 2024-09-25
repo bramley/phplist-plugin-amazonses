@@ -1,3 +1,6 @@
+version 1.4.1+20241005
+      Improve wording of configuration settings
+
 version 1.4.0+20231104
       Avoid dynamic property deprecation
       Choose region from a select list
